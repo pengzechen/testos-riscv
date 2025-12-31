@@ -7,27 +7,42 @@
 #include "types.h"
 
 // MMIO helper functions
-static inline uint32_t read32(volatile void *addr)
+static inline uint32_t read_reg(volatile void *addr)
 {
+#if defined(PLATFORM_QEMU)
+    return *(volatile uint8_t *)addr;
+#else
     return *(volatile uint32_t *)addr;
+#endif
 }
 
-static inline void write32(uint32_t value, volatile void *addr)
+static inline void write_reg(uint32_t value, volatile void *addr)
 {
+#if defined(PLATFORM_QEMU)
+    *(volatile uint8_t *)addr = (uint8_t)value;
+#else
     *(volatile uint32_t *)addr = value;
+#endif
 }
 
 // Wait for UART to be idle
 static void dw_uart_wait_idle(void)
 {
     for (int timeout = 100000; timeout > 0; timeout--) {
-        uint32_t usr = read32((void *)DW_UART_USR);
-        uint32_t lsr = read32((void *)DW_UART_LSR);
+        uint32_t lsr = read_reg((void *)DW_UART_LSR);
         
+#if defined(PLATFORM_SG2002)
+        uint32_t usr = read_reg((void *)DW_UART_USR);
         // Check UART is not busy and transmitter is empty
         if (!(usr & DW_UART_USR_BUSY) && (lsr & DW_UART_LSR_TEMT)) {
             return;
         }
+#else
+        // Standard 16550A: Just check transmitter empty
+        if (lsr & DW_UART_LSR_TEMT) {
+            return;
+        }
+#endif
         
         asm volatile("nop");
     }
@@ -36,13 +51,13 @@ static void dw_uart_wait_idle(void)
 // Check if TX is ready
 static bool dw_uart_tx_ready(void)
 {
-    return (read32((void *)DW_UART_LSR) & DW_UART_LSR_THRE) != 0;
+    return (read_reg((void *)DW_UART_LSR) & DW_UART_LSR_THRE) != 0;
 }
 
 // Check if RX has data
 static bool dw_uart_rx_ready(void)
 {
-    return (read32((void *)DW_UART_LSR) & DW_UART_LSR_DR) != 0;
+    return (read_reg((void *)DW_UART_LSR) & DW_UART_LSR_DR) != 0;
 }
 
 void dw_uart_early_init(void)
@@ -51,24 +66,24 @@ void dw_uart_early_init(void)
     dw_uart_wait_idle();
 
     // Disable all interrupts
-    write32(0, (void *)DW_UART_IER);
+    write_reg(0, (void *)DW_UART_IER);
 
     // Configure baud rate
     // For sg2002: UART_CLOCK = 3686400, BAUDRATE = 115200
     // Divisor = UART_CLOCK / (16 * BAUDRATE) = 3686400 / (16 * 115200) = 2
     uint32_t divisor = UART_CLOCK / (16 * UART_BAUDRATE);
     
-    uint32_t lcr = read32((void *)DW_UART_LCR);
-    write32(lcr | DW_UART_LCR_DLAB, (void *)DW_UART_LCR);
-    write32(divisor & 0xFF, (void *)DW_UART_DLL);
-    write32((divisor >> 8) & 0xFF, (void *)DW_UART_DLM);
-    write32(lcr & ~DW_UART_LCR_DLAB, (void *)DW_UART_LCR);
+    uint32_t lcr = read_reg((void *)DW_UART_LCR);
+    write_reg(lcr | DW_UART_LCR_DLAB, (void *)DW_UART_LCR);
+    write_reg(divisor & 0xFF, (void *)DW_UART_DLL);
+    write_reg((divisor >> 8) & 0xFF, (void *)DW_UART_DLM);
+    write_reg(lcr & ~DW_UART_LCR_DLAB, (void *)DW_UART_LCR);
 
     // 8N1 (8 data bits, no parity, 1 stop bit)
-    write32(0x3, (void *)DW_UART_LCR);
+    write_reg(0x3, (void *)DW_UART_LCR);
 
     // Enable and clear FIFO
-    write32(DW_UART_FCR_ENABLE_FIFO | DW_UART_FCR_CLEAR_RCVR | DW_UART_FCR_CLEAR_XMIT,
+    write_reg(DW_UART_FCR_ENABLE_FIFO | DW_UART_FCR_CLEAR_RCVR | DW_UART_FCR_CLEAR_XMIT,
             (void *)DW_UART_FCR);
 }
 
@@ -85,13 +100,13 @@ void dw_uart_putchar(char c)
     if (c == '\n') {
         while (!dw_uart_tx_ready())
             asm volatile("nop");
-        write32('\r', (void *)DW_UART_THR);
+        write_reg('\r', (void *)DW_UART_THR);
     }
 
     // Wait and send character
     while (!dw_uart_tx_ready())
         asm volatile("nop");
-    write32(c, (void *)DW_UART_THR);
+    write_reg(c, (void *)DW_UART_THR);
 }
 
 void dw_uart_puts(const char *str)
@@ -107,13 +122,13 @@ char dw_uart_getchar(void)
     while (!dw_uart_rx_ready()) {
         asm volatile("nop");
     }
-    return (char)(read32((void *)DW_UART_RBR) & 0xFF);
+    return (char)(read_reg((void *)DW_UART_RBR) & 0xFF);
 }
 
 int dw_uart_try_getchar(void)
 {
     if (dw_uart_rx_ready()) {
-        return (int)(read32((void *)DW_UART_RBR) & 0xFF);
+        return (int)(read_reg((void *)DW_UART_RBR) & 0xFF);
     }
     return -1;
 }

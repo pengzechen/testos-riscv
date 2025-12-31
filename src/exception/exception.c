@@ -278,8 +278,8 @@ handle_syscall_direct_c(uint64_t arg0,
     asm volatile("mv %0, a7" : "=r"(syscall_id));
 
     // 打印调试信息
-    // logger_info("[GATEWAY] Syscall ID: %lld, args: 0x%llx, 0x%llx, 0x%llx\n", 
-    //             syscall_id, arg0, arg1, arg2);
+    logger_info("[GATEWAY] Syscall ID: %lld, args: 0x%llx, 0x%llx, 0x%llx\n", 
+                syscall_id, arg0, arg1, arg2);
 
     // 处理 Linux 标准系统调用号 (musl 使用)
     switch (syscall_id) {

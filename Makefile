@@ -18,6 +18,9 @@ GDB = $(CROSS_COMPILE)gdb
 PROJECT_NAME = testos-riscv
 LOAD_ADDR = 0x80200000
 
+# 平台选择: sg2002 (默认) 或 qemu
+PLATFORM ?= sg2002
+
 # 目录配置
 SRC_DIR = src
 INCLUDE_DIR = include
@@ -38,6 +41,15 @@ CFLAGS += -D__LOAD_ADDR__=$(LOAD_ADDR)
 ASFLAGS = -march=rv64ima -mabi=lp64 -mcmodel=medany
 ASFLAGS += -g -I$(INCLUDE_DIR)
 ASFLAGS += -D__LOAD_ADDR__=$(LOAD_ADDR)
+
+# 平台宏定义
+ifeq ($(PLATFORM), qemu)
+    CFLAGS += -DPLATFORM_QEMU
+    ASFLAGS += -DPLATFORM_QEMU
+else
+    CFLAGS += -DPLATFORM_SG2002
+    ASFLAGS += -DPLATFORM_SG2002
+endif
 
 # 链接标志
 LDFLAGS = -T $(SRC_DIR)/boot/link.lds
