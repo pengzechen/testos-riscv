@@ -135,6 +135,115 @@ static void test_exception_handling(void)
 // 交互式命令处理
 // ===============================================================================
 
+// ELF64 程序头结构，用于 musl libc 初始化 TLS
+typedef struct {
+    uint32_t p_type;
+    uint32_t p_flags;
+    uint64_t p_offset;
+    uint64_t p_vaddr;
+    uint64_t p_paddr;
+    uint64_t p_filesz;
+    uint64_t p_memsz;
+    uint64_t p_align;
+} Elf64_Phdr;
+
+// 辅助向量 (Auxiliary Vector) 类型定义
+#define AT_NULL   0
+#define AT_PHDR   3
+#define AT_PHENT  4
+#define AT_PHNUM  5
+#define AT_PAGESZ 6
+#define AT_RANDOM 25
+
+extern uint8_t _user_prog_start[];
+extern uint8_t _user_prog_end[];
+
+/**
+ * 准备用户栈空间，填充 argc, argv, envp 和 auxv
+ * musl libc 的入口点 _start 期望栈上存在这些信息
+ */
+static uint64_t prepare_user_stack(uintptr_t stack_bottom, size_t stack_size)
+{
+    // 为当前用户程序硬编码程序头信息 (从 readelf -l user/user_prog 获取)
+    static Elf64_Phdr user_phdrs[] = {
+        { 1, 7, 0x1000, 0x80800000, 0x80800000, 0x19b8, 0x2024, 0x1000 }, // PT_LOAD
+        { 2, 6, 0x2798, 0x80801798, 0x80801798, 0x170, 0x170, 0x8 }       // PT_DYNAMIC
+    };
+
+    uint64_t *sp = (uint64_t *)(stack_bottom + stack_size);
+    
+    // RISC-V 栈需要 16 字节对齐
+    sp = (uint64_t *)((uintptr_t)sp & ~0xF);
+
+    // AT_RANDOM 所需的 16 字节随机数
+    static uint8_t random_bytes[16] = {
+        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88
+    };
+
+    // 1. 压入辅助向量 (Auxiliary Vector)
+    *(--sp) = 0; *(--sp) = AT_NULL;
+    *(--sp) = (uintptr_t)random_bytes; *(--sp) = AT_RANDOM;
+    *(--sp) = 4096; *(--sp) = AT_PAGESZ;
+    *(--sp) = 2; *(--sp) = AT_PHNUM;
+    *(--sp) = sizeof(Elf64_Phdr); *(--sp) = AT_PHENT;
+    *(--sp) = (uintptr_t)user_phdrs; *(--sp) = AT_PHDR;
+    
+    // 2. 压入环境变量 (envp) - 目前为空
+    *(--sp) = 0; // NULL 终止符
+
+    // 3. 压入参数 (argv)
+    *(--sp) = 0; // NULL 终止符
+    *(--sp) = (uintptr_t)"user_prog"; // argv[0]
+
+    // 4. 压入参数个数 (argc)
+    *(--sp) = 1;
+
+    return (uintptr_t)sp;
+}
+
+static void run_user_prog(void)
+{
+    uint64_t start_addr = 0x80800000;
+    size_t size = _user_prog_end - _user_prog_start;
+    
+    logger_info("Loading user program to 0x%llx (size: %d bytes)...\n", start_addr, size);
+    
+    // 1. 清除用户程序区域（包括 BSS 段）
+    // 根据 readelf，MemSiz 略大于 FileSiz，清除 16KB 足够覆盖 BSS
+    memset((void *)start_addr, 0, 0x4000);
+
+    // 2. 拷贝用户程序代码和数据
+    memcpy((void *)start_addr, _user_prog_start, size);
+    
+    // 3. 同步指令缓存 (Instruction Cache Barrier)
+    asm volatile("fence.i" ::: "memory");
+    
+    // 4. 分配并准备用户栈
+    // 为用户程序分配 64KB 栈空间
+    void *user_stack = malloc(64 * 1024);
+    if (!user_stack) {
+        logger_error("Failed to allocate user stack!\n");
+        return;
+    }
+    uint64_t sp = prepare_user_stack((uintptr_t)user_stack, 64 * 1024);
+
+    logger_info("Jumping to user program at 0x%llx with sp=0x%llx...\n", start_addr, sp);
+    
+    // 5. 切换栈并跳转执行
+    // musl libc 的 _start 约定 a0 指向栈顶
+    asm volatile (
+        "mv a0, %1\n"
+        "mv sp, %1\n"
+        "jr %0\n"
+        :
+        : "r"(start_addr), "r"(sp)
+        : "a0", "memory"
+    );
+    
+    logger_info("User program returned.\n");
+}
+
 static int process_command(const char *cmd)
 {
     if (strcmp(cmd, "help") == 0 || strcmp(cmd, "h") == 0) {
@@ -145,6 +254,7 @@ static int process_command(const char *cmd)
         uart_puts("  test, t        - Run basic tests\r\n");
         uart_puts("  syscall, s     - Test system calls\r\n");
         uart_puts("  exception, e   - Test exception handling\r\n");
+        uart_puts("  run, u         - Run embedded user program\r\n");
         uart_puts("  reboot, r      - Restart system\r\n");
         uart_puts("  quit, q        - Enter idle loop\r\n");
     }
@@ -173,6 +283,9 @@ static int process_command(const char *cmd)
     }
     else if (strcmp(cmd, "exception") == 0 || strcmp(cmd, "e") == 0) {
         test_exception_handling();
+    }
+    else if (strcmp(cmd, "run") == 0 || strcmp(cmd, "u") == 0) {
+        run_user_prog();
     }
     else if (strcmp(cmd, "reboot") == 0 || strcmp(cmd, "r") == 0) {
         uart_puts("Rebooting system...\r\n");

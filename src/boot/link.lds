@@ -26,6 +26,15 @@ SECTIONS {
         *(.text.*)
     } > RAM
 
+    /* Syscall Gateway - Fixed at 4KB offset from start */
+    . = __LOAD_ADDR__ + 0x4000;
+    .syscall_gateway : {
+        PROVIDE(__syscall_gateway_start = .);
+        *(.syscall_gateway)
+        . = ALIGN(4096);
+        PROVIDE(__syscall_gateway_end = .);
+    } > RAM
+
     /* Read-only data section - contains constants and strings */
     .rodata : {
         . = ALIGN(8);

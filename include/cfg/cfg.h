@@ -7,7 +7,12 @@
 
 // 内核加载地址 (QEMU virt 机器)
 #ifndef __LOAD_ADDR__
-#define __LOAD_ADDR__   0x80020000
+#define __LOAD_ADDR__   0x80200000
+#endif
+
+// 系统调用入口地址
+#ifndef __SYS_ENTER_ADDR__
+#define __SYS_ENTER_ADDR__ 0x80204000  
 #endif
 
 // 栈大小配置

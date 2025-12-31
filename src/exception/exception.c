@@ -263,6 +263,46 @@ default_interrupt_handler(trap_frame_t *frame)
 }
 
 // ===============================================================================
+// 直接系统调用处理函数 (从 Gateway 跳转而来)
+// ===============================================================================
+uint64_t
+handle_syscall_direct_c(uint64_t arg0,
+                        uint64_t arg1,
+                        uint64_t arg2,
+                        uint64_t arg3,
+                        uint64_t arg4,
+                        uint64_t arg5)
+{
+    // 获取 syscall id (在 a7 中，由调用者传递)
+    uint64_t syscall_id;
+    asm volatile("mv %0, a7" : "=r"(syscall_id));
+
+    // 打印调试信息
+    // logger_info("[GATEWAY] Syscall ID: %lld, args: 0x%llx, 0x%llx, 0x%llx\n", 
+    //             syscall_id, arg0, arg1, arg2);
+
+    // 处理 Linux 标准系统调用号 (musl 使用)
+    switch (syscall_id) {
+        case 64: // sys_write(fd, buf, count)
+        {
+            const char *buf = (const char *)arg1;
+            size_t count = (size_t)arg2;
+            for (size_t i = 0; i < count; i++) {
+                logger("%c", buf[i]);
+            }
+            return count;
+        }
+        case 93: // sys_exit(code)
+            logger_info("User program exited with code %lld\n", arg0);
+            while(1); // 简单挂起
+            return 0;
+        default:
+            // 尝试调用原有的处理逻辑
+            return default_syscall_handler(syscall_id, arg0, arg1, arg2, arg3, arg4);
+    }
+}
+
+// ===============================================================================
 // 默认系统调用处理函数
 // ===============================================================================
 static uint64_t

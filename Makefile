@@ -113,7 +113,7 @@ $(BIN_TARGET): $(ELF_TARGET)
 .PHONY: disasm
 disasm: $(ELF_TARGET)
 	@echo "Generating disassembly..."
-	$(OBJDUMP) -D -S $< > $(DUMP_TARGET)
+	$(OBJDUMP) -x -S -a $< > $(DUMP_TARGET)
 	@echo "Disassembly saved to: $(DUMP_TARGET)"
 
 # 显示符号表
@@ -266,6 +266,13 @@ $(BUILD_DIR)/%.d: $(SRC_DIR)/%.c
 $(BUILD_DIR)/%_asm.d: $(SRC_DIR)/%.S
 	@mkdir -p $(dir $@)
 	$(CC) $(ASFLAGS) -MM -MT $(patsubst %.d,%.o,$@) $< > $@
+
+# 确保用户程序在内核之前构建
+$(SRC_DIR)/user_bin.S: ../user/user_prog.bin
+
+../user/user_prog.bin:
+	@echo "Building user program..."
+	$(MAKE) -C ../user
 
 # 防止中间文件被删除
 .PRECIOUS: $(BUILD_DIR)/%.o $(BUILD_DIR)/%_asm.o
