@@ -148,7 +148,7 @@ sections: $(ELF_TARGET)
 QEMU = qemu-system-riscv64
 QEMU_MACHINE = virt
 QEMU_CPU = rv64
-QEMU_MEMORY = 128M
+QEMU_MEMORY = 256M
 QEMU_FLAGS = -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) -m $(QEMU_MEMORY)
 QEMU_FLAGS += -nographic
 QEMU_FLAGS += -bios default

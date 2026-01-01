@@ -273,16 +273,18 @@ static void run_user_prog(void)
 
     logger_info("Jumping to user program at 0x%llx with sp=0x%llx...\n", start_addr, sp);
     
-    // 5. 切换栈并跳转执行
-    // musl libc 的 _start 约定 a0 指向栈顶
-    asm volatile (
-        "mv a0, %1\n"
-        "mv sp, %1\n"
-        "jr %0\n"
-        :
-        : "r"(start_addr), "r"(sp)
-        : "a0", "memory"
-    );
+    // // 5. 切换栈并跳转执行
+    // // musl libc 的 _start 约定 a0 指向栈顶
+    // asm volatile (
+    //     "mv a0, %1\n"
+    //     "mv sp, %1\n"
+    //     "jr %0\n"
+    //     :
+    //     : "r"(start_addr), "r"(sp)
+    //     : "a0", "memory"
+    // );
+    void (*user_main)(void) = (void (*)(void))start_addr;
+    user_main();
     
     logger_info("User program returned.\n");
 }
