@@ -12,10 +12,12 @@
 typedef struct
 {
     uint64_t x[32];    // 通用寄存器 x0-x31 (x0 不使用)
+    uint64_t f[32];    // 浮点寄存器 f0-f31 (64位，支持单精度和双精度)
     uint64_t sepc;     // 异常程序计数器 (S-mode)
     uint64_t scause;   // 异常原因 (S-mode)
     uint64_t stval;    // 异常值 (S-mode)
     uint64_t sstatus;  // Supervisor 状态寄存器
+    uint64_t fcsr;     // 浮点控制和状态寄存器
 } trap_frame_t;
 
 // 异常处理函数指针类型

@@ -2,8 +2,8 @@
 # 实现异常向量表和上下文保存/恢复
 
 # 定义常量
-# TRAP_FRAME_SIZE: 36 个 64 位寄存器 = 36 * 8 = 288 字节
-.equ TRAP_FRAME_SIZE, 288
+# TRAP_FRAME_SIZE: 32通用寄存器 + 32浮点寄存器 + 5个CSR寄存器 = 69 * 8 = 552 字节
+.equ TRAP_FRAME_SIZE, 552
 
 # 异常原因码定义
 .equ CAUSE_SUPERVISOR_ECALL, 9
@@ -104,18 +104,56 @@ save_registers:
     addi t0, sp, TRAP_FRAME_SIZE   # 计算原始 sp
     sd   t0, 2*8(sp)               # 保存原始 sp
 
+    # 保存浮点寄存器 f0-f31
+    fsd  f0,  (32+0)*8(sp)
+    fsd  f1,  (32+1)*8(sp)
+    fsd  f2,  (32+2)*8(sp)
+    fsd  f3,  (32+3)*8(sp)
+    fsd  f4,  (32+4)*8(sp)
+    fsd  f5,  (32+5)*8(sp)
+    fsd  f6,  (32+6)*8(sp)
+    fsd  f7,  (32+7)*8(sp)
+    fsd  f8,  (32+8)*8(sp)
+    fsd  f9,  (32+9)*8(sp)
+    fsd  f10, (32+10)*8(sp)
+    fsd  f11, (32+11)*8(sp)
+    fsd  f12, (32+12)*8(sp)
+    fsd  f13, (32+13)*8(sp)
+    fsd  f14, (32+14)*8(sp)
+    fsd  f15, (32+15)*8(sp)
+    fsd  f16, (32+16)*8(sp)
+    fsd  f17, (32+17)*8(sp)
+    fsd  f18, (32+18)*8(sp)
+    fsd  f19, (32+19)*8(sp)
+    fsd  f20, (32+20)*8(sp)
+    fsd  f21, (32+21)*8(sp)
+    fsd  f22, (32+22)*8(sp)
+    fsd  f23, (32+23)*8(sp)
+    fsd  f24, (32+24)*8(sp)
+    fsd  f25, (32+25)*8(sp)
+    fsd  f26, (32+26)*8(sp)
+    fsd  f27, (32+27)*8(sp)
+    fsd  f28, (32+28)*8(sp)
+    fsd  f29, (32+29)*8(sp)
+    fsd  f30, (32+30)*8(sp)
+    fsd  f31, (32+31)*8(sp)
+
     # 保存异常相关的 CSR 寄存器
     csrr t0, sepc
-    sd   t0, 32*8(sp)              # 保存 sepc
+    sd   t0, 64*8(sp)              # 保存 sepc
     
     csrr t0, scause
-    sd   t0, 33*8(sp)              # 保存 scause
+    sd   t0, 65*8(sp)              # 保存 scause
     
     csrr t0, stval
-    sd   t0, 34*8(sp)              # 保存 stval
+    sd   t0, 66*8(sp)              # 保存 stval
     
     csrr t0, sstatus
-    sd   t0, 35*8(sp)              # 保存 sstatus
+    sd   t0, 67*8(sp)              # 保存 sstatus
+
+    # 保存浮点控制和状态寄存器 (FCSR)
+    csrr t0, fcsr
+    sd   t0, 68*8(sp)              # 保存 fcsr
 
 handle_trap:
     # 调用 C 语言异常处理函数
@@ -136,11 +174,49 @@ syscall_entry:
 
 restore_registers:
     # 恢复异常相关寄存器
-    ld   t0, 32*8(sp)              # 加载 sepc
+    ld   t0, 64*8(sp)              # 加载 sepc
     csrw sepc, t0
     
-    ld   t0, 35*8(sp)              # 加载 sstatus
+    ld   t0, 67*8(sp)              # 加载 sstatus
     csrw sstatus, t0
+
+    # 恢复浮点控制和状态寄存器
+    ld   t0, 68*8(sp)              # 加载 fcsr
+    csrw fcsr, t0
+
+    # 恢复浮点寄存器 f0-f31
+    fld  f0,  (32+0)*8(sp)
+    fld  f1,  (32+1)*8(sp)
+    fld  f2,  (32+2)*8(sp)
+    fld  f3,  (32+3)*8(sp)
+    fld  f4,  (32+4)*8(sp)
+    fld  f5,  (32+5)*8(sp)
+    fld  f6,  (32+6)*8(sp)
+    fld  f7,  (32+7)*8(sp)
+    fld  f8,  (32+8)*8(sp)
+    fld  f9,  (32+9)*8(sp)
+    fld  f10, (32+10)*8(sp)
+    fld  f11, (32+11)*8(sp)
+    fld  f12, (32+12)*8(sp)
+    fld  f13, (32+13)*8(sp)
+    fld  f14, (32+14)*8(sp)
+    fld  f15, (32+15)*8(sp)
+    fld  f16, (32+16)*8(sp)
+    fld  f17, (32+17)*8(sp)
+    fld  f18, (32+18)*8(sp)
+    fld  f19, (32+19)*8(sp)
+    fld  f20, (32+20)*8(sp)
+    fld  f21, (32+21)*8(sp)
+    fld  f22, (32+22)*8(sp)
+    fld  f23, (32+23)*8(sp)
+    fld  f24, (32+24)*8(sp)
+    fld  f25, (32+25)*8(sp)
+    fld  f26, (32+26)*8(sp)
+    fld  f27, (32+27)*8(sp)
+    fld  f28, (32+28)*8(sp)
+    fld  f29, (32+29)*8(sp)
+    fld  f30, (32+30)*8(sp)
+    fld  f31, (32+31)*8(sp)
 
     # 恢复通用寄存器
     ld   x1,  1*8(sp)              # ra

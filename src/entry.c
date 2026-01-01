@@ -62,6 +62,49 @@ static void test_syscalls(void)
 }
 
 // ===============================================================================
+// 浮点运算测试函数
+// ===============================================================================
+
+static void test_floating_point(void)
+{
+    uart_puts("=== Floating Point Unit Test ===\r\n");
+    
+    // 测试单精度浮点运算
+    float a = 3.14159f;
+    float b = 2.71828f;
+    float c = a + b;
+    float d = a * b;
+    
+    uart_puts("Single precision test:\r\n");
+    uart_puts("  a + b = ");
+    // 简单的浮点数输出 (整数部分)
+    uart_print_dec((int)c);
+    uart_puts(".\r\n");
+    uart_puts("  a * b = ");
+    uart_print_dec((int)d);
+    uart_puts(".\r\n");
+    
+    // 测试双精度浮点运算
+    double x = 1.4142135623730951;  // sqrt(2)
+    double y = 1.7320508075688772;  // sqrt(3)
+    double z = x * y;
+    
+    uart_puts("Double precision test:\r\n");
+    uart_puts("  sqrt(2) * sqrt(3) = ");
+    uart_print_dec((int)z);
+    uart_puts(".\r\n");
+    
+    // 测试浮点比较
+    if (c > a && c > b) {
+        uart_puts("  Comparison: c > a and c > b - PASS\r\n");
+    } else {
+        uart_puts("  Comparison: c > a and c > b - FAIL\r\n");
+    }
+    
+    uart_puts("Floating point test completed.\r\n");
+}
+
+// ===============================================================================
 // 基本功能测试
 // ===============================================================================
 
@@ -252,6 +295,7 @@ static int process_command(const char *cmd)
         uart_puts("  info, i        - Show system information\r\n");
         uart_puts("  mem, m         - Show memory statistics\r\n");
         uart_puts("  test, t        - Run basic tests\r\n");
+        uart_puts("  fp, float      - Test floating point unit\r\n");
         uart_puts("  syscall, s     - Test system calls\r\n");
         uart_puts("  exception, e   - Test exception handling\r\n");
         uart_puts("  run, u         - Run embedded user program\r\n");
@@ -277,6 +321,9 @@ static int process_command(const char *cmd)
     }
     else if (strcmp(cmd, "test") == 0 || strcmp(cmd, "t") == 0) {
         test_basic_functions();
+    }
+    else if (strcmp(cmd, "fp") == 0 || strcmp(cmd, "float") == 0) {
+        test_floating_point();
     }
     else if (strcmp(cmd, "syscall") == 0 || strcmp(cmd, "s") == 0) {
         test_syscalls();
@@ -361,11 +408,18 @@ void kernel_main(uint64_t hart_id)
     logger_info("Hart ID: 0x%llx\n", hart_id);
     logger("\n");
     
-    // 3. 初始化异常处理系统
+    // 3. 初始化浮点运算单元
+    logger_info("Enabling floating-point unit...\n");
+    // 设置 sstatus.FS = 11 (Dirty) 来启用浮点扩展（S-mode）
+    uint64_t sstatus_val = READ_SSTATUS();
+    sstatus_val |= (0x3ULL << 13);  // FS bits [14:13] = 11
+    WRITE_SSTATUS(sstatus_val);
+    
+    // 4. 初始化异常处理系统
     logger_info("Initializing exception handling...\n");
     exception_init();
     
-    // 4. 初始化定时器模块
+    // 5. 初始化定时器模块
     logger_info("Initializing timer...\n");
     timer_init();
     timer_enable();
@@ -374,7 +428,7 @@ void kernel_main(uint64_t hart_id)
     register_syscall_handler(0, sys_putchar);  // SYS_putchar
     register_syscall_handler(1, sys_puts);     // SYS_puts
     
-    // 5. 初始化内存管理
+    // 6. 初始化内存管理
     logger_info("Initializing memory management...\n");
     // mem_init(); // 在启动汇编中已调用
     

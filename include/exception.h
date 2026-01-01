@@ -10,10 +10,12 @@
 // 异常上下文结构体
 typedef struct {
     uint64_t x[32];        // 通用寄存器 x0-x31
+    uint64_t f[32];        // 浮点寄存器 f0-f31
     uint64_t mepc;         // 异常程序计数器
     uint64_t mcause;       // 异常原因
     uint64_t mtval;        // 异常值
     uint64_t mstatus;      // 机器状态寄存器
+    uint64_t fcsr;         // 浮点控制和状态寄存器
 } trap_frame_t;
 
 // 异常处理函数类型

@@ -30,7 +30,7 @@ BUILD_DIR = build
 # 编译和链接标志
 # ===============================================================================
 # C 编译标志
-CFLAGS = -march=rv64ima -mabi=lp64 -mcmodel=medany
+CFLAGS = -march=rv64imafd -mabi=lp64d -mcmodel=medany
 CFLAGS += -fno-builtin -fno-stack-protector -fno-pic
 CFLAGS += -g -O0 -Wall -Wextra -nostdlib -nostartfiles
 CFLAGS += -ffreestanding -fno-common
@@ -38,7 +38,7 @@ CFLAGS += -I$(INCLUDE_DIR)
 CFLAGS += -D__LOAD_ADDR__=$(LOAD_ADDR)
 
 # 汇编标志
-ASFLAGS = -march=rv64ima -mabi=lp64 -mcmodel=medany
+ASFLAGS = -march=rv64imafd -mabi=lp64d -mcmodel=medany
 ASFLAGS += -g -I$(INCLUDE_DIR)
 ASFLAGS += -D__LOAD_ADDR__=$(LOAD_ADDR)
 
